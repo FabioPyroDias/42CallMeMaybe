@@ -13,11 +13,9 @@ run:
 
 clean:
 
-
 lint:
 
 lint-strict:
 
 destroy: clean
 	$(RM) call-me-maybe
-	$(RM) uv.lock

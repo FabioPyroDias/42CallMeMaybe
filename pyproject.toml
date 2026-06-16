@@ -1,7 +1,7 @@
 [project]
 name = "call-me-maybe"
 version = "0.1.0"
-requires-python = "==3.8"
+requires-python = ">=3.10"
 dependencies = [
     "torch",
     "llm-sdk",
@@ -23,13 +23,5 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
-
 [tool.mypy]
 exclude = ["llm_sdk/"]
-
-[flake8]
-exclude = "llm_sdk/"
