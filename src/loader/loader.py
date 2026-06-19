@@ -18,10 +18,10 @@ def load_json(path: str) -> list[dict[Any, Any]]:
         raise ValueError("JSON file not properly formatted")
 
 
-def load_functions(functions: list[dict[Any, Any]]) -> list[FunctionDefinition]:
+def load_functions(f: list[dict[Any, Any]]) -> list[FunctionDefinition]:
     try:
         return [FunctionDefinition.model_validate(function)
-                for function in functions]
+                for function in f]
     except ValidationError as error:
         raise ValueError(f"Invalid function definition: {error}")
 
@@ -31,4 +31,10 @@ def load_prompts(prompts: list[dict[Any, Any]]) -> list[TestPrompt]:
         return [TestPrompt.model_validate(prompt) for prompt in prompts]
     except ValidationError as error:
         raise ValueError(f"Invalid prompt definition: {error}")
-    
+
+
+def load_vocab(vocab: dict[Any, Any]) -> dict[int, str]:
+    new_vocab = {}
+    for key, value in vocab.items():
+        new_vocab[value] = key
+    return new_vocab

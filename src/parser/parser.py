@@ -1,7 +1,4 @@
 import argparse
-import json
-from typing import Any, Union
-from src.models.models import FunctionDefinition, TestPrompt
 
 
 def parse_arguments() -> argparse.Namespace:
