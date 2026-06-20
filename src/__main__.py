@@ -4,8 +4,71 @@ from src.loader.loader import load_functions, load_prompts, load_vocab
 from src.models.models import FunctionDefinition, FunctionCall, TestPrompt
 from llm_sdk import Small_LLM_Model
 import sys
-import torch
+from numpy import inf
 import json
+
+
+
+def generate_field(model, input_ids, samples, field_end) -> list[int]:
+    generated = []
+
+    max_tokens = 100
+    current_token = 0
+    possible_tokens = samples.copy()
+    while (current_token < max_tokens):
+        logits = model.get_logits_from_input_ids(input_ids + generated)
+
+        for token_id in range(len(logits)):
+            exists = False
+            for function in possible_tokens:
+                if len(generated) >= len(function):
+                    if len(function) == len(generated):
+                        for token_end in field_end:
+                            if token_id == token_end:
+                                exists = True
+                elif token_id == function[len(generated)]:
+                    exists = True
+
+            if not exists:
+                logits[token_id] = -inf
+
+        next_token = logits.index(max(logits))
+        generated.append(next_token)
+
+        for finish in field_end:
+            if next_token == finish:
+                return generated
+
+        for index in range(len(possible_tokens) - 1, -1, -1):
+            if len(generated) >= len(possible_tokens[index]):
+                continue
+            elif possible_tokens[index][len(generated) - 1] != next_token:
+                possible_tokens.remove(possible_tokens[index])
+
+        current_token += 1
+
+    return []
+
+
+
+def constrained_decoding(model: Small_LLM_Model, input_ids: list[int],
+                         function_call: str,
+                         functions: list[FunctionDefinition]) -> str:
+    functions_ids = []
+    for function in functions:
+        functions_ids.append(model.encode(function.name).squeeze().tolist())
+
+    field_end = model.encode("\"").squeeze().tolist()
+    if isinstance(field_end, int):
+        field_end = [field_end]
+
+    generated = generate_field(model, input_ids, functions_ids, field_end)
+
+    if len(generated) == 0:
+        raise ValueError("Could not generate a valid function name "\
+                         "within the token limit")
+
+    return function_call + model.decode(generated)
 
 def generate_function_call(prompt: TestPrompt,
                            functions: list[FunctionDefinition],
@@ -34,20 +97,10 @@ def generate_function_call(prompt: TestPrompt,
     function_call = f"{{\"prompt\": \"{prompt.prompt}\",\n\"name\": \""
     input_ids = model.encode(encoding_message + function_call).squeeze().tolist()
 
-    generated = []
-    max_tokens = 100
-    current_token = 0
-    error = True
-    while (current_token < max_tokens):
-        logits = model.get_logits_from_input_ids(input_ids + generated)
-        next_token = logits.index(max(logits))
-        generated.append(next_token)
-        current_token += 1
-    result = function_call + model.decode(generated)
-    print(result)
+    constrained_decoding(model, input_ids, function_call, functions)
+
 
 if __name__ == "__main__":
-    torch.set_num_threads(2)
     args = parse_arguments()
     try:
         functions = load_functions(load_json(args.functions_definition))
@@ -58,34 +111,6 @@ if __name__ == "__main__":
 
         generate_function_call(prompts[0], functions, model, vocab)
 
-        """ input_ids = model.encode(prompts[0].prompt).squeeze().tolist()
-        generated = []
-        max_tokens = 1
-        current_token = 0
-        error = True
-        while (current_token < max_tokens):
-            logits = model.get_logits_from_input_ids(input_ids + generated)
-            next_token = logits.index(max(logits))
-
-
-
-            generated.append(next_token)
-
-            try:
-                output = json.loads(model.decode(generated))
-                if "prompt" in output and "name" in output and "parameters" in output:
-                    error = True
-                    break
-            except json.JSONDecodeError:
-                pass
-
-            print(f"Token {len(generated)}: {next_token} . Current_token {current_token}")
-            current_token += 1
-        if error:
-            print(f"Error: After {max_tokens} iterations, no output was generated")
-        else:
-            print(f"Result: {model.decode(generated)}")
-        print(model.get_path_to_vocab_file()) """
     except ValueError as error:
         print(f"ERROR: {error}")
         sys.exit(1)
